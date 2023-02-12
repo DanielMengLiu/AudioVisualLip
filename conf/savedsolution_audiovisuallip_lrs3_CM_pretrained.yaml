@@ -1,0 +1,142 @@
+#============================= DATA ============================================================================
+# change path to your train manifest and dirs
+train_manifest: data/manifest/LRS3_trainval_manifest.csv 
+train_audiodir: /datasets1/LRS3/audio/
+train_videodir: /datasets1/LRS3/lip/
+# change path to your train trial and dirs
+test_lrs3:
+  test_trial: data/trial/lrs3_O.txt              
+  test_audiodir: /datasets1/LRS3/audio/
+  test_videodir: /datasets1/LRS3/lip/
+test_vox1:
+  test_trial: data/trial/vox1_O-29.txt            
+  test_audiodir: /datasets2/voxceleb1/audio/
+  test_videodir: /datasets2/voxceleb1/lip/test/
+test_lomgrid:
+  test_trial: data/trial/lomgrid_O.txt
+  test_audiodir: /data/datasets/Lombard GRID/lombardgrid/audio/
+  test_videodir: /datasets2/lomgrid/lip/
+test_grid:
+  test_trial: data/trial/grid_O.txt
+  test_audiodir: /data/datasets/GRID/audio/
+  test_videodir: /datasets2/grid/lip/
+
+# change path to your splited musan and rir paths
+musan_path: /datasets1/musan_split/            # split musan will load faster
+rir_path: /datasets1/RIRS_NOISES/simulated_rirs/
+#============================= STAGE =============================================================================
+train:
+  gpus: [5,6]                               # example: [0] | [3,5] | [] (for cpu)
+  audiomodel: ECAPA-TDNN                    # choose a model from [MODEL ZOO]
+  visualmodel: MCNN                         # choose a model from [MODEL ZOO]
+  audiovisualmodel: CM
+  audioresume: exp/lrs3_joint-training_ECAPA-TDNN_MCNN_noisespec3blocks1/audionet_11.pth  # None (from scratch) | exp/${train.model}/net_10.pth (continuous training)
+  visualresume: exp/lrs3_joint-training_ECAPA-TDNN_MCNN_noisespec3blocks1/visualnet_11.pth # None (from scratch) | exp/${train.model}/net_10.pth (continuous training)
+  audiovisualresume: None
+  seconds: [2.0, 2.0]                          # example: [2.0,3.0] variable chunk sampler | [2.0,2.0] fixed 2s
+  epochs: 40                                  # num of epochs
+  batchsize: 128                                # batchsize
+  optimizer: adam                              # sgd | adam | nadam
+  lr_scheduler: steplr                         # steplr | cycliclr 
+  warmup_steps: 2000                           # example: 2000 | 0 (not warmup) 
+  flood: None                                  # None | Yes
+  scale: 30                                    # 30 | 32
+  margins: [0.0, 0.2]                          # example: [0.0,0.2] gradually increase | [0.2,0.2] fixed margin 0.2
+  augmentation: { 'noiseaug': 0.6,
+                  'specaug': 0.3,
+                  'speedperturb': [1.0]}       # 'speedperturb': [1.0, 0.9, 1.1]  
+  validate_steps: 4                             
+  validate_num_workers: 1                      # number of workers doing validation
+  savemodel_steps: 1                           # save and test performance later
+  wandb: online                                # off | online | offline
+
+finetune:
+  gpus: [0,1,2]                                  # example: [0] | [3,5] | [] (for cpu)
+  audiomodel: ECAPA-TDNN                         # choose a model from [MODEL ZOO]
+  audioresume: exp/${finetune.model}/net_30.pth     # exp/${finetune.model}/net_30.pth (beginning point)
+  seconds: [2.0, 2.0]                          # example: [2.0,3.0] variable chunk sampler | [2.0,2.0] fixed 2s
+  augmentation: {'speedperturb': [1.0]}
+  epochs: 40                                   # num of epochs (train + finetune)
+  batchsize: 200                               # batchsize
+  optimizer: adam                              # sgd | adam | nadam
+  lr_scheduler: steplr                         # steplr | cycliclr 
+  warmup_steps: 2000                           # example: 2000 | 0 (no warmup)
+  scale: 30                                    # 30 | 32
+  margins: [0.2, 0.5]                          # example: [0.0,0.2] gradually increase | [0.2,0.2] fixed margin 0.2
+  savemodel_steps: 1                           # save and test performance later
+  wandb: off                                   # off | online | offline
+
+test:
+  data: test_grid                              # test_lrs3 | test_vox1 | test_lomgrid | test_grid
+  type: audiovisual                                  # audio | visual | audiovisual
+  gpus: [0,1,2,3]                                  # example: [0] | [3,5] | [] (for cpu)
+  audiomodel: ECAPA-TDNN                       # choose a model from [MODEL ZOO]
+  visualmodel: MCNN                            # choose a model from [MODEL ZOO]
+  audiovisualmodel: CM
+  audiovisualembedding: ['v']        # 'a' | 'v' | 'transa' | 'transv'
+  embed_extract: offline
+  audioresume: exp/lrs3_cross-modal_ECAPA-TDNN_MCNN_pretrained/audionet_27.pth  # None (from scratch) | exp/${train.model}/net_10.pth (continuous training)
+  visualresume: exp/lrs3_cross-modal_ECAPA-TDNN_MCNN_pretrained/visualnet_27.pth  # None (from scratch) | exp/${train.model}/net_10.pth (continuous training)
+  audiovisualresume: exp/lrs3_cross-modal_ECAPA-TDNN_MCNN_pretrained/audiovisualnet_27.pth
+  num_workers_per_gpu: 1                       # example: 1 | 3
+  score_norm: asnorm                           # asnorm
+  write_score: False
+
+#======================== MODEL Zoo ===========================================================================
+# example: MFA-Conformer | ResNet34 | ECAPA-TDNN
+ResNet18:
+ResNet34:
+  feature: Fbank80
+ResNet50:
+ResNet101:
+ResNet152:
+ResNet221:
+MFA-Conformer:
+  embedding_dim: 192
+  feature: Fbank80
+  num_blocks: 6
+  hidden_dim: 256
+  input_layer: conv2d2
+  pos_enc_layer_type: rel_pos
+  pooling: ASP                                # ASP | SP | AP
+  loss: AAMSoftmax                            # AAMSoftmax
+ECAPA-TDNN:
+  embedding_dim: 192
+  feature: Fbank80
+  pooling: ASP                                # ASP | SP | AP
+  loss: AAMSoftmax                            # AAMSoftmax
+MCNN:
+  embedding_dim: 192
+  backbone_type: resnet
+  relu_type: prelu
+  tcn_dropout: 0.2
+  tcn_dwpw: false
+  tcn_kernel_size: [5]
+  tcn_num_layers: 2
+  tcn_width_mult: 1
+  width_mult: 1.0
+  pooling: ASP                                # ASP | SP | AP
+  loss: AAMSoftmax            
+#========================= Feature ==============================================================================
+Fbank80:
+  n_mels: 80                                   # num of fbanks
+  n_fft: 512                                   # num of fft
+  f_min: 20                                    # min frequency
+  f_max: 7600                                  # max frequency
+  sample_rate: 16000                           # audio sampling rate 
+  win_length: 400                              # 25ms (window length)
+  hop_length: 160                              # 10ms (window shift)
+  window_fn: torch.hamming_window              # window function
+#========================== OPTIMIZER ===========================================================================
+sgd:
+  init_lr: 0.001
+  weight_decay: 0.0001
+  momentum: 0.9
+  nesterov: True
+adam:
+  init_lr: 0.001
+  weight_decay: 0.0000001
+#====================== SCORE NORMALIZE =========================================================================
+cohort_manifest: data/manifest/cohort_manifest.csv
+asnorm:
+  submean: True

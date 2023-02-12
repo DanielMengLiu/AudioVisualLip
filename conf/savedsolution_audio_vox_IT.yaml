@@ -1,0 +1,114 @@
+#============================= DATA ============================================================================
+# change path to your train manifest and dirs
+train_manifest: data/manifest/voxceleb2_dev_manifest.csv
+train_audiodir: /datasets2/voxceleb2/audio/dev/aac/
+# change path to your train trial and dirs
+test_lrs3:
+  test_trial: data/trial/lrs3_O.txt              
+  test_audiodir: /datasets1/LRS3/audio/
+test_vox1:
+  test_trial: data/trial/vox1_O.txt            
+  test_audiodir: /datasets2/voxceleb1/audio/
+test_lomgrid:
+  test_trial: data/trial/lomgrid_O.txt
+  test_audiodir: /data/datasets/Lombard GRID/lombardgrid/audio/
+test_grid:
+  test_trial: data/trial/grid_O.txt
+  test_audiodir: /data/datasets/GRID/audio/
+# change path to your splited musan and rir paths
+musan_path: /datasets1/musan_split/            # split musan will load faster
+rir_path: /datasets1/RIRS_NOISES/simulated_rirs/
+#============================= STAGE =============================================================================
+train:
+  gpus: [0,1,3,5]                                    # example: [0] | [3,5] | [] (for cpu)
+  model: ECAPA-TDNN                            # choose a model from [MODEL ZOO]
+  resume: None    # None (from scratch) | exp/${train.model}/net_10.pth (continuous training)
+  seconds: [2.0, 2.0]                          # example: [2.0,3.0] variable chunk sampler | [2.0,2.0] fixed 2s
+  epochs: 60                                   # num of epochs
+  batchsize: 800                               # batchsize
+  optimizer: adam                              # sgd | adam | nadam
+  lr_scheduler: steplr                         # steplr | cycliclr 
+  warmup_steps: 2000                           # example: 2000 | 0 (not warmup) 
+  flood: None                                  # None | Yes
+  scale: 30                                    # 30 | 32
+  margins: [0.0, 0.2]                          # example: [0.0,0.2] gradually increase | [0.2,0.2] fixed margin 0.2
+  augmentation: { 'noiseaug': 0.5,
+                  'specaug': 0.4,
+                  'speedperturb': [1.0]}
+  validate_steps: 1                             
+  validate_num_workers: 1                      # number of workers doing validation
+  savemodel_steps: 1                           # save and test performance later
+  wandb: online                                   # off | online | offline
+
+finetune:
+  gpus: [1,2]                                  # example: [0] | [3,5] | [] (for cpu)
+  model: MFA-Conformer                         # choose a model from [MODEL ZOO]
+  resume: exp/${finetune.model}/net_30.pth     # exp/${finetune.model}/net_30.pth (beginning point)
+  seconds: [2.0, 2.0]                          # example: [2.0,3.0] variable chunk sampler | [2.0,2.0] fixed 2s
+  augmentation: {'speedperturb': [1.0]}
+  epochs: 40                                   # num of epochs (train + finetune)
+  batchsize: 200                               # batchsize
+  optimizer: adam                              # sgd | adam | nadam
+  lr_scheduler: steplr                         # steplr | cycliclr 
+  warmup_steps: 2000                           # example: 2000 | 0 (no warmup)
+  scale: 30                                    # 30 | 32
+  margins: [0.2, 0.5]                          # example: [0.0,0.2] gradually increase | [0.2,0.2] fixed margin 0.2
+  savemodel_steps: 1                           # save and test performance later
+  wandb: off                                   # off | online | offline
+
+test:
+  data: test_grid                              # test_lrs3 | test_vox1 | test_lomgrid | test_grid
+  gpus: [0,1,2]                                    # example: [0] | [3,5] | [] (for cpu)
+  model: ECAPA-TDNN                         # choose a model from [MODEL ZOO]
+  resume: exp/lrs3_independent-training_ECAPA-TDNN/net_47.pth     
+  #resume: exp/lrs3_ECAPA-TDNN_epoch28dcf0.23/net_28.pth
+  num_workers_per_gpu: 1                       # example: 1 | 3
+  score_norm: asnorm                           # asnorm
+  write_score: False
+
+#======================== MODEL Zoo ===========================================================================
+# example: MFA-Conformer | ResNet34 | ECAPA-TDNN
+ResNet18:
+ResNet34:
+  feature: Fbank80
+ResNet50:
+ResNet101:
+ResNet152:
+ResNet221:
+MFA-Conformer:
+  feature: Fbank80
+  num_blocks: 6
+  hidden_dim: 256
+  embedding_dim: 192
+  input_layer: conv2d2
+  pos_enc_layer_type: rel_pos
+  pooling: ASP                                # ASP | SP | AP
+  loss: AAMSoftmax                            # AAMSoftmax
+ECAPA-TDNN:
+  embedding_dim: 192
+  feature: Fbank80
+  pooling: ASP                                # ASP | SP | AP
+  loss: AAMSoftmax                            # AAMSoftmax
+#========================= Feature ==============================================================================
+Fbank80:
+  n_mels: 80                                   # num of fbanks
+  n_fft: 512                                   # num of fft
+  f_min: 20                                    # min frequency
+  f_max: 7600                                  # max frequency
+  sample_rate: 16000                           # audio sampling rate 
+  win_length: 400                              # 25ms (window length)
+  hop_length: 160                              # 10ms (window shift)
+  window_fn: torch.hamming_window              # window function
+#========================== OPTIMIZER ===========================================================================
+sgd:
+  init_lr: 0.001
+  weight_decay: 0.0001
+  momentum: 0.9
+  nesterov: True
+adam:
+  init_lr: 0.001
+  weight_decay: 0.0000001
+#====================== SCORE NORMALIZE =========================================================================
+cohort_manifest: data/manifest/cohort_manifest.csv
+asnorm:
+  submean: True
