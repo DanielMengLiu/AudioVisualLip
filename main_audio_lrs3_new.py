@@ -20,7 +20,7 @@ from utils.eval_metrics_new import *
 MODE  = 'train'           # train | test | finetune
 #####################################################################
 
-SEED  = 2022              # fixed random seed for fair comparison
+SEED  = 1022              # fixed random seed for fair comparison
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed_all(SEED)
@@ -54,24 +54,28 @@ class Trainer(object):
 
         self.featureopts = OPTS[self.modelopts['feature']]
         self.dataopts = {}
-        self.dataopts = {**{'seconds':self.stageopts['seconds']}, **{'sample_rate':self.featureopts['sample_rate']} }
+        # self.dataopts = {**{'seconds':self.stageopts['seconds']}, **{'sample_rate':self.featureopts['sample_rate']} }
+        self.dataopts = {'seconds':self.stageopts['seconds'],'sample_rate':self.featureopts['sample_rate']}
         for aug in self.stageopts['augmentation'].keys():
-            self.dataopts = {**self.dataopts, **{aug:self.stageopts['augmentation'][aug]}}
-        for traindata in ['train_manifest', 'train_audiodir', 'musan_path', 'rir_path']: # for train and aug 
-            self.dataopts = {**self.dataopts, **{traindata:OPTS[traindata]}}
-        for testdata in ['test_trial', 'test_audiodir',]: # for val
-            self.dataopts = {**self.dataopts, **{testdata:OPTS['test_lrs3'][testdata]}}
-            
+            # self.dataopts = {**self.dataopts, **{aug:self.stageopts['augmentation'][aug]}}
+            self.dataopts[aug] = self.stageopts['augmentation'][aug]
+        for traindata in ['train_manifest', 'train_audiodir', 'musan_path', 'rir_path']: # for train and aug
+            # self.dataopts = {**self.dataopts, **{traindata:OPTS[traindata]}}
+            self.dataopts[traindata] = OPTS[traindata]
+        for testdata in ['test_trial', 'test_audiodir']: # for val
+            # self.dataopts = {**self.dataopts, **{testdata:OPTS['test_lrs3'][testdata]}}
+            self.dataopts[testdata] = OPTS['test_lrs3'][testdata]
+
         self.trainset = datasets.AudioTrainset(self.dataopts)
         self.trainloader = DataLoader(self.trainset, shuffle=True, batch_size=self.stageopts['batchsize'], num_workers=4*device_num, drop_last=True)
 
         times = len(self.stageopts['augmentation']['speedperturb']) # whether do speaker augmentation by speed perturb
-        self.audiocriterion = AAMsoftmax(n_class=self.trainset.n_spk*times, m=self.stageopts['margins'][1], s=self.stageopts['scale'], em_dim=self.audioemb_dim).to(self.device) 
+        self.audiocriterion = AAMsoftmax(n_class=self.trainset.n_spk*times, m=self.stageopts['margins'][1], s=self.stageopts['scale'], em_dim=self.audioemb_dim).to(self.device)
 
-        param_groups = [{'params': self.audiomodel.parameters()}, 
+        param_groups = [{'params': self.audiomodel.parameters()},
                         {'params': self.audiocriterion.parameters()},
                         ]
- 
+
         if self.stageopts['optimizer'] == 'sgd':
             self.optimopts = OPTS['sgd']
             self.optim = optim.SGD(param_groups, self.optimopts['init_lr'], nesterov=self.optimopts['nesterov'], momentum = self.optimopts['momentum'], weight_decay = self.optimopts['weight_decay'])
@@ -84,7 +88,7 @@ class Trainer(object):
             self.lr_scheduler = optim.lr_scheduler.MultiStepLR(self.optim, milestones=[10,15], gamma=0.1)
         elif self.stageopts['lr_scheduler'] == 'cycliclr':
             self.lr_scheduler = optim.lr_scheduler.CyclicLR(self.optim, cycle_momentum=False, base_lr=0.000001, max_lr=0.001,step_size_up=2000,step_size_down=2000)
-        
+
         self.eers = []
         self.dcfs = []
         self.current_epoch, self.epochs = 0, self.stageopts['epochs']
@@ -99,7 +103,7 @@ class Trainer(object):
             self._load()
         else:
             print('Train from scratch: there is no specified resume.')
-        
+
         self.wandb = self.stageopts['wandb']
         if self.wandb != False:
             config = {
@@ -123,7 +127,7 @@ class Trainer(object):
             self.optim.load_state_dict(ckpt['optimizer'])
         if 'audiocriterion' in ckpt.keys():
             self.audiocriterion = ckpt['audiocriterion']
-                    
+
     def _train(self):
         start_epoch = self.current_epoch
         for epoch in range(start_epoch + 1, self.epochs + 1):
@@ -136,13 +140,13 @@ class Trainer(object):
         self.audiocriterion.train()
         audiosum_loss, audiosum_samples, audiocorrect = 0, 0, 0
         progress_bar = tqdm(self.trainloader)
-                
+
         for batch_idx, (audiofeats, targets_label) in enumerate(progress_bar):
             self.optim.zero_grad()
             audiofeats = audiofeats.to(self.device)
             targets_label = targets_label.to(self.device)
             _, output_audio_ = self.audiomodel(audiofeats, aug=True)
-            
+
             audioloss, audiologits = self.audiocriterion(output_audio_, targets_label)
             audioloss.backward()
 
@@ -157,10 +161,10 @@ class Trainer(object):
             #         pg['lr'] = lr_scale * 0.001
 
             self.optim.step()
-         
+
             audiosum_loss += audioloss.item() * len(targets_label)
             progress_bar.set_description(
-                    'Train Epoch: {:3d} [{:4d}/{:4d} ({:3.3f}%)] audioLoss: {:.4f} audioAcc: {:.4f}%' #  
+                    'Train Epoch: {:3d} [{:4d}/{:4d} ({:3.3f}%)] audioLoss: {:.4f} audioAcc: {:.4f}%' #
                     .format(self.current_epoch, batch_idx + 1,
                     len(self.trainloader), 100. * (batch_idx + 1) / len(self.trainloader),
                     audiosum_loss / audiosum_samples, 100. * audiocorrect / audiosum_samples))
@@ -173,21 +177,23 @@ class Trainer(object):
         val_step = 1
         if self.current_epoch % val_step == 0:
             eer, minDCF = self._eval_network(stage='val', num_workers=1)
-            self.eers.append(eer)         
-            self.dcfs.append(minDCF)      
-            with open('log/'+self.exp+'-training.log', "a+") as score_file:   
+            self.eers.append(eer)
+            self.dcfs.append(minDCF)
+            if not os.path.isdir('log/'):
+                os.mkdir('log')
+            with open('log/'+self.exp+'-training.log', "a+") as score_file:
                 score_file.write("%d epoch, LR %f, LOSS %f, ACC %2.2f%%, EER %2.2f%%, minDCF %2.4f, bestEER %2.2f%%, bestminDCF %2.4f\n"  \
                                 %(self.current_epoch, self.optim.state_dict()['param_groups'][0]['lr'], audiosum_loss / audiosum_samples, \
                                 100. * audiocorrect / audiosum_samples, self.eers[-1], self.dcfs[-1], min(self.eers), min(self.dcfs)))
                 score_file.flush()
         return audiosum_loss / audiosum_samples
-        
+
     def _save(self, modelpath):
         torch.save({'epoch': self.current_epoch,
                     'audiostate_dict': self.audiomodel.state_dict(),
-                    'audiocriterion': self.audiocriterion, 
+                    'audiocriterion': self.audiocriterion,
                     'optimizer': self.optim.state_dict()},
-                    modelpath) 
+                    modelpath)
 
     def _extract_embedding(self, stage, filelist):  # stage='val'
         testset = datasets.AudioTestset(self.dataopts, filelist, stage='val')
@@ -214,7 +220,7 @@ class Trainer(object):
         del localmodel
         torch.cuda.empty_cache()
 
-    def _score_embedding(self, stage, trials, score_dict):  
+    def _score_embedding(self, stage, trials, score_dict):
         # GRID scoring for global and local embeddings and save score in score/MODELDIR/score_TRIAL.txt
         emb_dir = os.path.join('exp/{}/{}_emb'.format(self.exp, stage))
         for line in trials:
@@ -239,7 +245,7 @@ class Trainer(object):
             files.append(line.split()[-2])
             files.append(line.split()[-1])
         setfiles = list(set(files))
-        setfiles.sort()   
+        setfiles.sort()
         part = list(range(0, len(setfiles)+1, int(len(setfiles)//num_workers)))
         part[-1] = len(setfiles)
         utts = [setfiles[part[i]:part[i+1]] for i in range(num_workers)]
@@ -254,7 +260,7 @@ class Trainer(object):
             ctx = mp.get_context("spawn")
             jobs = [ctx.Process(target=self._extract_embedding, args=(a)) for a in args]
             for j in jobs: j.start()
-            for j in jobs: j.join()  
+            for j in jobs: j.join()
         self.audiomodel = self.audiomodel.to(self.device)
 
         num_workers = 40
@@ -266,7 +272,7 @@ class Trainer(object):
         jobs = [Process(target=self._score_embedding, args=(a)) for a in args]
         for j in jobs: j.start()
         for j in jobs: j.join()
-        
+
         scores, labels = [], []
         for line in lines:
             scores.append(score_dict[line][0])
@@ -282,7 +288,7 @@ class Trainer(object):
     def _print_config(self, opts):
         pp = pprint.PrettyPrinter(indent = 2)
         pp.pprint(opts)
- 
+
     def __call__(self):
         print("[Model is saved in: {}]".format(self.exp))
         # print("Data opts: ")
@@ -310,14 +316,16 @@ class Tester(object):
         self.featureopts = OPTS[self.modelopts['feature']]
         self.dataopts = {}
         for data in ['train_manifest', 'train_audiodir', 'cohort_manifest']: # for submean, cohort, and test
-            self.dataopts = {**self.dataopts, **{data:OPTS[data]}}
+            # self.dataopts = {**self.dataopts, **{data:OPTS[data]}}
+            self.dataopts[data] = OPTS[data]
         for testdata in ['test_trial', 'test_audiodir',]: # for test
-            self.dataopts = {**self.dataopts, **{testdata:OPTS[self.stageopts['data']][testdata]}}
+            # self.dataopts = {**self.dataopts, **{testdata:OPTS[self.stageopts['data']][testdata]}}
+            self.dataopts[testdata] = OPTS[self.stageopts['data']][testdata]
 
-    def _extract_submeanembedding(self, stage):  
+    def _extract_submeanembedding(self, stage):
         self.submeanset = datasets.AudioSubmeanset(self.dataopts)
         self.submeanloader = DataLoader(self.submeanset, batch_size = 400, shuffle=False, num_workers=4, drop_last=True)
-        
+
         os.environ["CUDA_VISIBLE_DEVICES"] = ','.join([str(gpu) for gpu in self.gpus])
         device = torch.device('cuda')
         testmodel = get_model(self.modelname)
@@ -335,7 +343,7 @@ class Tester(object):
             for audiofeat, utt in tqdm(dataloader):
                 audiofeat = audiofeat.to(device)
                 utt = utt[0]
-                _, output_audio_ = testmodel(audiofeat, aug=False) 
+                _, output_audio_ = testmodel(audiofeat, aug=False)
                 output_audio_ = output_audio_.cpu().numpy()
                 if sum_output_audio is None:
                    sum_output_audio =  np.mean(output_audio_, axis=0)
@@ -376,7 +384,7 @@ class Tester(object):
                 embedding_local = embedding_local.cpu().numpy()
                 np.savez_compressed(os.path.join(spk_dir, os.path.basename(utt.split('.')[0])), [embedding_global, embedding_local])
 
-    def _score_embedding(self, stage, trials, score_dict):  
+    def _score_embedding(self, stage, trials, score_dict):
         emb_dir = os.path.join('exp/{}/{}_emb'.format(self.exp, stage))
         for line in trials:
             embedding_11 = torch.FloatTensor(np.load(os.path.join(emb_dir, line.split()[-2].split('.')[0]+'.npz'), allow_pickle=True)['arr_0'][0])
@@ -404,7 +412,7 @@ class Tester(object):
                 files.append(line.split()[-2])
                 files.append(line.split()[-1])
             setfiles = list(set(files))
-            setfiles.sort()   
+            setfiles.sort()
             part = list(range(0, len(setfiles)+1, int(len(setfiles)//num_workers)))
             part[-1] = len(setfiles)
             utts = [setfiles[part[i]:part[i+1]] for i in range(num_workers)]
@@ -414,7 +422,7 @@ class Tester(object):
             for line in lines:
                 files.append(line)
         setfiles = list(set(files))
-        setfiles.sort()   
+        setfiles.sort()
         part = list(range(0, len(setfiles)+1, int(len(setfiles)//num_workers)))
         part[-1] = len(setfiles)
         utts = [setfiles[part[i]:part[i+1]] for i in range(num_workers)]
@@ -428,9 +436,9 @@ class Tester(object):
             jobs = [Process(target=self._extract_embedding, args=(a)) for a in args]
             for j in jobs: j.start()
             for j in jobs: j.join()
-        
+
         if stage == 'cohort':
-            print('finished') 
+            print('finished')
             return
 
         num_workers = 20
@@ -441,7 +449,7 @@ class Tester(object):
         args = [(stage, trials[i], score_dict) for i in range(num_workers)]
         jobs = [Process(target=self._score_embedding, args=(a)) for a in args]
         for j in jobs: j.start()
-        for j in jobs: j.join()  
+        for j in jobs: j.join()
 
         # GRID scoring for global and local embeddings and save score in score/MODELDIR/score_TRIAL.txt
         scores, labels  = [], []
@@ -458,7 +466,7 @@ class Tester(object):
                     elif len(line.split()) == 2:
                         fout.write('{} {} {:.5f}\n'.format(line.split()[-2], line.split()[-1], score_dict[line][0]))
 
-        if len(line.split()) == 3:                
+        if len(line.split()) == 3:
             # Coumpute EER and minDCF
             EER = tuneThresholdfromScore(scores, labels, [1, 0.1])[1]
             fnrs, fprs, thresholds = ComputeErrorRates(scores, labels)

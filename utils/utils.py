@@ -71,3 +71,17 @@ def read_table(table_file):
             tokens = line.strip().split()
             table_list.append(tokens)
     return table_list
+
+def read_video_gray(filename):
+    video = []
+    cap = cv2.VideoCapture(filename)
+    while(cap.isOpened()):
+        ret, frame = cap.read() # BGR
+        if ret:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            video.append(frame)
+        else:
+            break
+    cap.release()
+    video = np.array(video)
+    return video

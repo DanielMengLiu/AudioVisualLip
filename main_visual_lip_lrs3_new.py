@@ -10,16 +10,16 @@ import torch.multiprocessing as mp
 from multiprocessing import Process, Manager
 from torch.utils.data import DataLoader
 import datasets_new as datasets
-from models.loss import AAMsoftmax, KLDivergenceLoss, ValueLoss, CoregularizationLoss
+from models.loss import AAMsoftmax
 from models.network_new import AudioModel, VisualModel, AudioVisualModel
 from utils.eval_metrics_new import *
 
 
 ################# GLOBAL CONFIGURATION ##############################
-MODE  = 'train'           # train | test | finetune
+MODE  = 'test'           # train | test | finetune
 #####################################################################
 
-SEED  = 2022              # fixed random seed for fair comparison
+SEED  = 1022              # fixed random seed for fair comparison
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed_all(SEED)
@@ -52,12 +52,15 @@ class Trainer(object):
         self.visualmodel = torch.nn.DataParallel(visualmodel.to(self.device), device_ids=self.device_ids)
         
         self.dataopts = {}
-        self.dataopts = {**{'seconds':self.stageopts['seconds']}}
-        for traindata in ['train_manifest',  'train_videodir']: # for train, val, and aug 
-            self.dataopts = {**self.dataopts, **{traindata:OPTS[traindata]}}
+        # self.dataopts = {**{'seconds':self.stageopts['seconds']}}
+        self.dataopts = {'seconds':self.stageopts['seconds']}
+        for traindata in ['train_manifest',  'train_videodir']: # for train, val, and aug
+            # self.dataopts = {**self.dataopts, **{traindata:OPTS[traindata]}}
+            self.dataopts[traindata] = OPTS[traindata]
         for valdata in ['test_trial', 'test_videodir']: # for val
-            self.dataopts = {**self.dataopts, **{valdata:OPTS['test_lrs3'][valdata]}}
-            
+            # self.dataopts = {**self.dataopts, **{valdata:OPTS['test_lrs3'][valdata]}}
+            self.dataopts[valdata] = OPTS['test_lrs3'][valdata]
+
         self.trainset = datasets.VisualLipTrainset(self.dataopts)
         self.trainloader = DataLoader(self.trainset, shuffle=True, batch_size=self.stageopts['batchsize'], num_workers=4*device_num, drop_last=True)
 
@@ -117,7 +120,7 @@ class Trainer(object):
                 self.visualmodel.load_state_dict(visualckpt['visualstate_dict'], strict=False)
             if 'visualcriterion' in visualckpt.keys():
                 self.visualcriterion = visualckpt['visualcriterion']
-                
+
     def _train(self):
         start_epoch = self.current_epoch
         for epoch in range(start_epoch + 1, self.epochs + 1):
@@ -169,7 +172,9 @@ class Trainer(object):
         if self.current_epoch % interval_val == 0:
             eer, minDCF = self._eval_network(stage='val', num_workers=2)
             self.eers.append(eer)      
-            self.dcfs.append(minDCF)     
+            self.dcfs.append(minDCF)
+            if not os.path.isdir('log/'):
+                os.mkdir('log')
             with open('log/'+self.exp+'-training.log', "a+") as score_file:   
                 score_file.write("%d epoch, LR %f, LOSS %f, ACC %2.2f%%, EER %2.2f%%, minDCF %2.4f, bestEER %2.2f%%, bestminDCF %2.4f\n"  \
                                 %(self.current_epoch, self.optim.state_dict()['param_groups'][0]['lr'], videosum_loss/videosum_samples, \
@@ -300,9 +305,10 @@ class Tester(object):
 
         self.dataopts = {}
         for data in ['train_manifest', 'cohort_manifest']: # for submean, cohort, and test
-            self.dataopts = {**self.dataopts, **{data:OPTS[data]}}
+            # self.dataopts = {**self.dataopts, **{data:OPTS[data]}}
+            self.dataopts[data] = OPTS[data]
         for testdata in ['test_trial', 'test_videodir',]: # for test
-            self.dataopts = {**self.dataopts, **{testdata:OPTS[self.stageopts['data']][testdata]}}
+            self.dataopts[testdata] = OPTS[self.stageopts['data']][testdata]
             
     def _extract_embedding(self, stage, filelist, gpu):  # test | cohort | submean
         testset = datasets.VisualLipTestset(self.dataopts, filelist, stage)

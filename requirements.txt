@@ -1,0 +1,16 @@
+tqdm~=4.64.1
+numpy~=1.21.6
+opencv-python~=4.7.0.68
+torch~=1.12.1+cu113
+scikit-learn~=1.0.2
+matplotlib~=3.5.3
+scipy~=1.7.3
+Pillow~=9.4.0
+torchvision~=0.13.1+cu113
+PyYAML~=6.0
+typeguard~=2.13.3
+torchaudio~=0.12.1+cu113
+soundfile~=0.12.1
+scikit-image~=0.19.3
+wandb~=0.13.10
+face_alignment

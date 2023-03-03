@@ -20,7 +20,7 @@ musan_path: /datasets1/musan_split/            # split musan will load faster
 rir_path: /datasets1/RIRS_NOISES/simulated_rirs/
 #============================= STAGE =============================================================================
 train:
-  gpus: [0,1,3,5]                                    # example: [0] | [3,5] | [] (for cpu)
+  gpus: [0,1,3,5]                              # example: [0] | [3,5] | [] (for cpu)
   model: ECAPA-TDNN                            # choose a model from [MODEL ZOO]
   resume: None    # None (from scratch) | exp/${train.model}/net_10.pth (continuous training)
   seconds: [2.0, 2.0]                          # example: [2.0,3.0] variable chunk sampler | [2.0,2.0] fixed 2s
@@ -32,13 +32,13 @@ train:
   flood: None                                  # None | Yes
   scale: 30                                    # 30 | 32
   margins: [0.0, 0.2]                          # example: [0.0,0.2] gradually increase | [0.2,0.2] fixed margin 0.2
-  augmentation: { 'noiseaug': 0.5,
+  augmentation: { 'noiseaug': 0.5,             # if
                   'specaug': 0.4,
                   'speedperturb': [1.0]}
   validate_steps: 1                             
   validate_num_workers: 1                      # number of workers doing validation
   savemodel_steps: 1                           # save and test performance later
-  wandb: online                                   # off | online | offline
+  wandb: off                                   # off | on
 
 finetune:
   gpus: [1,2]                                  # example: [0] | [3,5] | [] (for cpu)
@@ -54,7 +54,7 @@ finetune:
   scale: 30                                    # 30 | 32
   margins: [0.2, 0.5]                          # example: [0.0,0.2] gradually increase | [0.2,0.2] fixed margin 0.2
   savemodel_steps: 1                           # save and test performance later
-  wandb: off                                   # off | online | offline
+  wandb: off                                   # off | on
 
 test:
   data: test_grid                              # test_lrs3 | test_vox1 | test_lomgrid | test_grid

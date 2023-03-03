@@ -11,7 +11,7 @@ import torch.multiprocessing as mp
 from multiprocessing import Process, Manager
 from torch.utils.data import DataLoader
 import datasets_new as datasets
-from models.loss import AAMsoftmax, KLDivergenceLoss, ValueLoss, CoregularizationLoss
+from models.loss import AAMsoftmax
 from models.network_new import AudioModel, VisualModel, AudioVisualModel
 from utils.eval_metrics_new import *
 
@@ -20,7 +20,7 @@ from utils.eval_metrics_new import *
 MODE  = 'test'           # train | test | finetune
 #####################################################################
 
-SEED  = 2022              # fixed random seed for fair comparison
+SEED  = 1022              # fixed random seed for fair comparison
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed_all(SEED)
@@ -60,7 +60,7 @@ class Trainer(object):
         audiovisualmodel = get_audiovisualmodel(self.audiovisualmodelname)
         print('audio model parameters_count: %.2fM' % (sum(p.numel() for p in audiomodel.parameters() if p.requires_grad)/1e6))
         print('visual model parameters_count: %.2fM' % (sum(p.numel() for p in visualmodel.parameters() if p.requires_grad)/1e6))
-        print('visual model parameters_count: %.2fM' % (sum(p.numel() for p in audiovisualmodel.parameters() if p.requires_grad)/1e6))
+        print('audio-visual model parameters_count: %.2fM' % (sum(p.numel() for p in audiovisualmodel.parameters() if p.requires_grad)/1e6))
         
         device_ids, device_num = self.stageopts['gpus'], len(self.stageopts['gpus'])
         os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(gpu) for gpu in device_ids])
@@ -72,13 +72,17 @@ class Trainer(object):
         
         self.featureopts = OPTS[self.audiomodelopts['feature']]
         self.dataopts = {}
-        self.dataopts = {**{'seconds':self.stageopts['seconds']}, **{'sample_rate':self.featureopts['sample_rate']} }
+        # self.dataopts = {**{'seconds':self.stageopts['seconds']}, **{'sample_rate':self.featureopts['sample_rate']} }
+        self.dataopts = {'seconds':self.stageopts['seconds'], 'sample_rate':self.featureopts['sample_rate']}
         for aug in self.stageopts['augmentation'].keys():
-            self.dataopts = {**self.dataopts, **{aug:self.stageopts['augmentation'][aug]}}
-        for traindata in ['train_manifest', 'train_audiodir', 'train_videodir', 'musan_path', 'rir_path']: # for train and aug 
-            self.dataopts = {**self.dataopts, **{traindata:OPTS[traindata]}}
+            # self.dataopts = {**self.dataopts, **{aug:self.stageopts['augmentation'][aug]}}
+            self.dataopts[aug] = self.stageopts['augmentation'][aug]
+        for traindata in ['train_manifest', 'train_audiodir', 'train_videodir', 'musan_path', 'rir_path']: # for train and aug
+            # self.dataopts = {**self.dataopts, **{traindata:OPTS[traindata]}}
+            self.dataopts[traindata] = OPTS[traindata]
         for valdata in ['test_trial', 'test_audiodir', 'test_videodir']: # for val
-            self.dataopts = {**self.dataopts, **{valdata:OPTS['test_lrs3'][valdata]}}
+            # self.dataopts = {**self.dataopts, **{valdata:OPTS['test_lrs3'][valdata]}}
+            self.dataopts[valdata] = OPTS['test_lrs3'][valdata]
 
         self.trainset = datasets.AudioVisualLipTrainset(self.dataopts)
         self.trainloader = DataLoader(self.trainset, shuffle=True, batch_size=self.stageopts['batchsize'], num_workers=4*device_num, drop_last=True)
@@ -262,7 +266,9 @@ class Trainer(object):
             self.aeers.append(aeer)         
             self.adcfs.append(aminDCF)    
             self.veers.append(veer)         
-            self.vdcfs.append(vminDCF)    
+            self.vdcfs.append(vminDCF)
+            if not os.path.isdir('log/'):
+                os.mkdir('log')
             with open('log/'+self.exp+'-training.log', "a+") as score_file:   
                 score_file.write("%d epoch, LR %f, LOSS %f, ACC %2.2f%%, aEER %2.2f%%, aminDCF %2.4f, abestEER %2.2f%%, abestminDCF %2.4f\n"  \
                                 %(self.current_epoch, self.optim.state_dict()['param_groups'][0]['lr'], audiosum_loss / audiosum_samples, \
@@ -443,9 +449,10 @@ class Tester(object):
         self.featureopts = OPTS[self.audiomodelopts['feature']]
         self.dataopts = {}
         for data in ['train_manifest', 'train_audiodir', 'train_videodir', 'cohort_manifest']: # for submean, cohort, and test
-            self.dataopts = {**self.dataopts, **{data:OPTS[data]}}
+            # self.dataopts = {**self.dataopts, **{data:OPTS[data]}}
+            self.dataopts[data] = OPTS[data]
         for testdata in ['test_trial', 'test_audiodir', 'test_videodir']: # for test
-            self.dataopts = {**self.dataopts, **{testdata:OPTS[self.stageopts['data']][testdata]}}
+            self.dataopts[testdata] = OPTS[self.stageopts['data']][testdata]
         self.embeds = Manager().dict()
         
     def _extract_embedding(self, stage, filelist, gpu):  # test | cohort | submean
@@ -736,7 +743,7 @@ if __name__ == '__main__':
     elif MODE == 'test': 
         tester = Tester()
         
-        tester._eval_network(stage='test', num_workers=12)
+        tester._eval_network(stage='test', num_workers=4)
 
     # elif MODE == 'extract_submean_embedding':
     #     trainer.extract_submeanembedding()    

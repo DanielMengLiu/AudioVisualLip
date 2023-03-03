@@ -9,6 +9,8 @@ from torch.utils.data import Dataset
 from models.preprocess_new import *
 from models.preprocess_new import FeatureAug
 from models.feature_new import OnlineFbank
+from utils.utils import read_video_gray
+
 
 class AudioTrainset(Dataset):
     def __init__(self, audioopts):
@@ -32,7 +34,8 @@ class AudioTrainset(Dataset):
         for index, line in enumerate(lines):
             speaker_label = dictkeys[line.split(',')[0]]
             file_name     = line.split(',')[2]
-            num_segments  = round(float(line.split(',')[3])/self.num_second + 0.5) # math trick
+            # math trick:num_segments=int(audio_len//num_second + 1)
+            num_segments  = round(float(line.split(',')[3])/self.num_second + 0.5)
             for i in range(num_segments):
                 self.data_label.append(speaker_label)
                 self.data_list.append(file_name + '___' + str(i))  # 
@@ -58,14 +61,9 @@ class AudioTrainset(Dataset):
         self.feataug = FeatureAug() # Spec augmentation
     
     def __len__(self):
-        if len(self.data_list) < 1090000: # lrs3
-            return len(self.data_list)
-        else:                            # vox2
-            return len(self.data_list)
+        return len(self.data_list)
 
     def __getitem__(self, index):
-        
-        index = index % len(self.data_list)
         
         audio, sr = sf.read(os.path.join(self.audiodata_dir, self.data_list[index].split('___')[0] + self.audiodata_suffix)) #
         length_audio = self.num_second * 16000 + 240
@@ -121,7 +119,7 @@ class VisualLipTrainset(Dataset):
         TRAIN_MANIFEST = videoopts['train_manifest']
 
         self.videodata_dir = videoopts['train_videodir']
-        self.videodata_suffix = '.npz'
+        self.videodata_suffix = '.mp4'
         self.video_fps = 25
         
         # Load data & labels
@@ -141,20 +139,17 @@ class VisualLipTrainset(Dataset):
         self.n_spk = len(set(self.data_label))
     
     def __len__(self):
-        if len(self.data_list) < 1090000: # lrs3
-            return len(self.data_list) #* 3
-        else:                            # vox2
-            return len(self.data_list) #* 3 
+        return len(self.data_list)
 
     def __getitem__(self, index):
-
-        index = index % len(self.data_list)
         
         videofeats = []
-        videofilename = os.path.join(self.videodata_dir, self.data_list[index].split('.')[0].split('___')[0]) + self.videodata_suffix #
+        # videofilename = os.path.join(self.videodata_dir, self.data_list[index].split('.')[0].split('___')[0]) + self.videodata_suffix #
+        videofilename = os.path.join(self.videodata_dir, self.data_list[index].split('___')[0]) + self.videodata_suffix #
 
         if os.path.exists(videofilename):
-            video = np.load(videofilename, allow_pickle=True)['data']
+            # video = np.load(videofilename, allow_pickle=True)['data']
+            video = read_video_gray(videofilename)
         else:
             video = np.random.rand(50,96,96)
         length_video = math.floor(self.num_second * self.video_fps)
@@ -184,7 +179,7 @@ class AudioVisualLipTrainset(Dataset):
         self.audiodata_dir = audioopts['train_audiodir']
         self.videodata_dir = audioopts['train_videodir']
         self.audiodata_suffix = '.wav'
-        self.videodata_suffix = '.npz'
+        self.videodata_suffix = '.mp4'
         self.video_fps = 25
         
         # Load data & labels
@@ -223,18 +218,13 @@ class AudioVisualLipTrainset(Dataset):
         self.feataug = FeatureAug() # Spec augmentation
             
     def __len__(self):
-        if len(self.data_list) < 1090000: # lrs3
-            return len(self.data_list)
-        else:                             # vox2
-            return 1090000 #len(self.data_list)
+        return len(self.data_list)
 
     def __getitem__(self, index):
         
-        index = index % len(self.data_list)
-        
         # random select a frame number in uniform distribution
-        audiofilename = os.path.join(self.audiodata_dir, self.data_list[index].split('.')[0].split('___')[0]) + self.audiodata_suffix #
-        videofilename = os.path.join(self.videodata_dir, self.data_list[index].split('.')[0].split('___')[0]) + self.videodata_suffix #
+        audiofilename = os.path.join(self.audiodata_dir, self.data_list[index].split('___')[0]) + self.audiodata_suffix #
+        videofilename = os.path.join(self.videodata_dir, self.data_list[index].split('___')[0]) + self.videodata_suffix #
 
         # audio sampling
         audio, sr = sf.read(audiofilename)	
@@ -286,7 +276,8 @@ class AudioVisualLipTrainset(Dataset):
             audiofeat = self.feature(audiofeat)
             
         if os.path.exists(videofilename):
-            video = np.load(videofilename, allow_pickle=True)['data']
+            # video = np.load(videofilename, allow_pickle=True)['data']
+            video = read_video_gray(videofilename)
         else:
             video = np.random.rand(50,96,96)
         length_video = math.floor(self.num_second * self.video_fps)
@@ -486,7 +477,7 @@ class AudioTestset(Dataset):
         return len(self.utts)
 
     def __getitem__(self, idx):
-        utt = self.utts[idx].split('.')[0]
+        utt = self.utts[idx]
 
         audioutt_path = os.path.join(self.audiodata_dir, utt+self.audiodata_suffix)
         #audio sampling
@@ -519,18 +510,19 @@ class VisualLipTestset(Dataset):
 
         if stage == 'val' or stage == 'test':
             self.videodata_dir = videoopts['test_videodir']
-        self.videodata_suffix = '.npz'
+        self.videodata_suffix = '.mp4'
         self.utts = utts
 
     def __len__(self):
         return len(self.utts)
 
     def __getitem__(self, idx):
-        utt = self.utts[idx].split('.')[0]
+        utt = self.utts[idx]
         videoutt_path = os.path.join(self.videodata_dir, utt+self.videodata_suffix)
         #video sampling
         if os.path.exists(videoutt_path):
-            video = np.load(videoutt_path)['data']
+            # video = np.load(videoutt_path)['data']
+            video = read_video_gray(videoutt_path)
         else:
             print('no lip') #video = np.random.rand(50,96,96)
         # global utterance
@@ -558,7 +550,7 @@ class AudioVisualLipTestset(Dataset):
             self.audiodata_dir = opts['test_audiodir']
             self.videodata_dir = opts['test_videodir']
         self.audiodata_suffix = '.wav'
-        self.videodata_suffix = '.npz'
+        self.videodata_suffix = '.mp4'
         self.utts = utts
         # for GRID datasets
         self.resample = torchaudio.transforms.Resample(44100, 16000)
@@ -568,7 +560,7 @@ class AudioVisualLipTestset(Dataset):
         return len(self.utts)
 
     def __getitem__(self, idx):
-        utt = self.utts[idx].split('.')[0]
+        utt = self.utts[idx]
         
         audioutt_path = os.path.join(self.audiodata_dir, utt+self.audiodata_suffix)
         #audio sampling
@@ -596,7 +588,8 @@ class AudioVisualLipTestset(Dataset):
         videoutt_path = os.path.join(self.videodata_dir, utt+self.videodata_suffix)
         #video sampling
         if os.path.exists(videoutt_path):
-            video = np.load(videoutt_path)['data']
+            # video = np.load(videoutt_path)['data']
+            video = read_video_gray(videoutt_path)
         else:
             print('no lip') #video = np.random.rand(50,96,96)
         # global utterance

@@ -17,7 +17,7 @@ test_grid:
   test_videodir: /datasets2/grid/lip/
 #============================= STAGE =============================================================================
 train:
-  gpus: [0,1]                            # example: [0] | [3,5] | [] (for cpu)
+  gpus: [4,5]                            # example: [0] | [3,5] | [] (for cpu)
   visualmodel: MCNN                            # choose a model from [MODEL ZOO]
   visualresume: None  # None (from scratch) | exp/${train.model}/net_10.pth (continuous training)
   seconds: [2.0, 2.0]                          # example: [2.0,3.0] variable chunk sampler | [2.0,2.0] fixed 2s

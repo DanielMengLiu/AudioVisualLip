@@ -48,7 +48,7 @@ train:
   validate_steps: 4                             
   validate_num_workers: 1                      # number of workers doing validation
   savemodel_steps: 1                           # save and test performance later
-  wandb: online                                # off | online | offline
+  wandb: online                                # off | on
 
 finetune:
   gpus: [0,1,2]                                  # example: [0] | [3,5] | [] (for cpu)
@@ -64,7 +64,7 @@ finetune:
   scale: 30                                    # 30 | 32
   margins: [0.2, 0.5]                          # example: [0.0,0.2] gradually increase | [0.2,0.2] fixed margin 0.2
   savemodel_steps: 1                           # save and test performance later
-  wandb: off                                   # off | online | offline
+  wandb: off                                   # off | on
 
 test:
   data: test_vox1                              # test_lrs3 | test_vox1 | test_lomgrid | test_grid

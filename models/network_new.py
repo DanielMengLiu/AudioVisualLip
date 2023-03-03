@@ -33,8 +33,6 @@ class VisualModel(nn.Module):
 class AudioModel(nn.Module):
     def __init__(self, model='MFA-Conformer', C=1024):
         super(AudioModel, self).__init__()
-        self.feature = OnlineFbank()
-        self.feataug = FeatureAug() # Spec augmentation
         if model == 'MFA-Conformer':
             self.AudioEncoder = MFAConformer()
             self.AudioDecoder = ASP_Decoder(hidden_dim=256*6)

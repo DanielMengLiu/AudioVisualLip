@@ -20,11 +20,11 @@ musan_path: /datasets1/musan_split/            # split musan will load faster
 rir_path: /datasets1/RIRS_NOISES/simulated_rirs/
 #============================= STAGE =============================================================================
 train:
-  gpus: [1]                                    # example: [0] | [3,5] | [] (for cpu)
+  gpus: [4，5]                                    # example: [0] | [3,5] | [] (for cpu)
   model: ECAPA-TDNN                            # choose a model from [MODEL ZOO]
   resume: None    # None (from scratch) | exp/${train.model}/net_10.pth (continuous training)
   seconds: [2.0, 2.0]                          # example: [2.0,3.0] variable chunk sampler | [2.0,2.0] fixed 2s
-  epochs: 40                                  # num of epochs
+  epochs: 20                                  # num of epochs
   batchsize: 128                               # batchsize
   optimizer: adam                              # sgd | adam | nadam
   lr_scheduler: steplr                         # steplr | cycliclr 
@@ -38,7 +38,7 @@ train:
   validate_steps: 1                             
   validate_num_workers: 1                      # number of workers doing validation
   savemodel_steps: 1                           # save and test performance later
-  wandb: off                                   # off | online | offline
+  wandb: off                                   # off | on
 
 finetune:
   gpus: [1,2]                                  # example: [0] | [3,5] | [] (for cpu)
@@ -54,13 +54,13 @@ finetune:
   scale: 30                                    # 30 | 32
   margins: [0.2, 0.5]                          # example: [0.0,0.2] gradually increase | [0.2,0.2] fixed margin 0.2
   savemodel_steps: 1                           # save and test performance later
-  wandb: off                                   # off | online | offline
+  wandb: off                                   # off | on
 
 test:
-  data: test_vox1                              # test_lrs3 | test_vox1 | test_lomgrid | test_grid
-  gpus: [5,6]                                # example: [0] | [3,5] | [] (for cpu)
+  data: test_lrs3                              # test_lrs3 | test_vox1 | test_lomgrid | test_grid
+  gpus: [4,5]                                # example: [0] | [3,5] | [] (for cpu)
   model: ECAPA-TDNN                            # choose a model from [MODEL ZOO]
-  resume: exp/lrs3_independent-training_ECAPA-TDNN_clean/net_18.pth     
+  resume: exp/lrs3_independent-training_ECAPA-TDNN_noisespec3blocks_3/net_20.pth
   #resume: exp/lrs3_ECAPA-TDNN_epoch28dcf0.23/net_28.pth
   num_workers_per_gpu: 1                       # example: 1 | 3
   score_norm: asnorm                           # asnorm

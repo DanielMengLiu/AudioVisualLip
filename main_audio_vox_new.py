@@ -20,7 +20,7 @@ from utils.eval_metrics_new import *
 MODE  = 'train'           # train | test | finetune
 #####################################################################
 
-SEED  = 2022              # fixed random seed for fair comparison
+SEED  = 1022              # fixed random seed for fair comparison
 np.random.seed(SEED)
 torch.manual_seed(SEED)
 torch.cuda.manual_seed_all(SEED)
@@ -54,14 +54,18 @@ class Trainer(object):
 
         self.featureopts = OPTS[self.modelopts['feature']]
         self.dataopts = {}
-        self.dataopts = {**{'seconds':self.stageopts['seconds']}, **{'sample_rate':self.featureopts['sample_rate']}}
+        # self.dataopts = {**{'seconds':self.stageopts['seconds']}, **{'sample_rate':self.featureopts['sample_rate']}}
+        self.dataopts = {'seconds':self.stageopts['seconds'], 'sample_rate':self.featureopts['sample_rate']}
         for aug in self.stageopts['augmentation'].keys():
-            self.dataopts = {**self.dataopts, **{aug:self.stageopts['augmentation'][aug]}}
-        for traindata in ['train_manifest', 'train_audiodir', 'musan_path', 'rir_path']: # for train and aug 
-            self.dataopts = {**self.dataopts, **{traindata:OPTS[traindata]}}
-        for testdata in ['test_trial', 'test_audiodir',]: # for val
-            self.dataopts = {**self.dataopts, **{testdata:OPTS['test_vox1'][testdata]}}
-            
+            # self.dataopts = {**self.dataopts, **{aug:self.stageopts['augmentation'][aug]}}
+            self.dataopts[aug] = self.stageopts['augmentation'][aug]
+        for traindata in ['train_manifest', 'train_audiodir', 'musan_path', 'rir_path']: # for train and aug
+            # self.dataopts = {**self.dataopts, **{traindata:OPTS[traindata]}}
+            self.dataopts[traindata] = OPTS[traindata]
+        for testdata in ['test_trial', 'test_audiodir']: # for val
+            # self.dataopts = {**self.dataopts, **{testdata:OPTS['test_vox1'][testdata]}}
+            self.dataopts[testdata] = OPTS['test_vox1'][testdata]
+
         self.trainset = datasets.AudioTrainset(self.dataopts)
         self.trainloader = DataLoader(self.trainset, shuffle=True, batch_size=self.stageopts['batchsize'], num_workers=4*device_num, drop_last=True)
 
@@ -174,7 +178,9 @@ class Trainer(object):
         if self.current_epoch % val_step == 0:
             eer, minDCF = self._eval_network(stage='val', num_workers=1)
             self.eers.append(eer)         
-            self.dcfs.append(minDCF)      
+            self.dcfs.append(minDCF)
+            if not os.path.isdir('log/'):
+                os.mkdir('log')
             with open('log/'+self.exp+'-training.log', "a+") as score_file:   
                 score_file.write("%d epoch, LR %f, LOSS %f, ACC %2.2f%%, EER %2.2f%%, minDCF %2.4f, bestEER %2.2f%%, bestminDCF %2.4f\n"  \
                                 %(self.current_epoch, self.optim.state_dict()['param_groups'][0]['lr'], audiosum_loss / audiosum_samples, \
@@ -310,9 +316,11 @@ class Tester(object):
         self.featureopts = OPTS[self.modelopts['feature']]
         self.dataopts = {}
         for data in ['train_manifest', 'train_audiodir', 'cohort_manifest']: # for submean, cohort, and test
-            self.dataopts = {**self.dataopts, **{data:OPTS[data]}}
+            # self.dataopts = {**self.dataopts, **{data:OPTS[data]}}
+            self.dataopts[data] = OPTS[data]
         for testdata in ['test_trial', 'test_audiodir',]: # for test
-            self.dataopts = {**self.dataopts, **{testdata:OPTS[self.stageopts['data']][testdata]}}
+            # self.dataopts = {**self.dataopts, **{testdata:OPTS[self.stageopts['data']][testdata]}}
+            self.dataopts[testdata] = OPTS[self.stageopts['data']][testdata]
 
     def _extract_submeanembedding(self, stage):  
         self.submeanset = datasets.AudioSubmeanset(self.dataopts)
