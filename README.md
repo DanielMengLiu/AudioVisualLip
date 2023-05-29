@@ -7,7 +7,7 @@ This is the official implementation of ICASSP23 paper CROSS-MODAL AUDIO-VISUAL C
 
 ## Datasets
 ![image](https://github.com/DanielMengLiu/AudioVisualLip/assets/45690014/d1f88a36-e874-49cd-a02c-25b98c423362)
-![image](https://github.com/DanielMengLiu/AudioVisualLip/assets/45690014/1f2d5917-8cd8-4e57-b0c7-872f020f2bf5) =200x
+![image](https://github.com/DanielMengLiu/AudioVisualLip/assets/45690014/1f2d5917-8cd8-4e57-b0c7-872f020f2bf5#pic_center=200x)
 
 ## Results
 ![image](https://github.com/DanielMengLiu/AudioVisualLip/assets/45690014/d70da2de-c2f8-417f-999d-2d9778ba719a)
