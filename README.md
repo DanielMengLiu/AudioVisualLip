@@ -15,37 +15,24 @@ This is the official implementation of ICASSP23 paper CROSS-MODAL AUDIO-VISUAL C
 
 ## Reference
 AVLip:
-
+```
 @inproceedings{liu2023cross,
-
   title={Cross-Modal Audio-Visual Co-Learning for Text-Independent Speaker Verification},
-  
   author={Liu, Meng and Lee, Kong Aik and Wang, Longbiao and Zhang, Hanyi and Zeng, Chang and Dang, Jianwu},
-  
   booktitle={ICASSP 2023-2023 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
-  
   pages={1--5},
-  
   year={2023},
-  
   organization={IEEE}
-  
 }
-
+```
 DeepLip:
-
+```
 @inproceedings{liu2021deeplip,
-
   title={DeepLip: A Benchmark for Deep Learning-Based Audio-Visual Lip Biometrics},
-  
   author={Liu, Meng and Wang, Longbiao and Lee, Kong Aik and Zhang, Hanyi and Zeng, Chang and Dang, Jianwu},
-  
   booktitle={2021 IEEE Automatic Speech Recognition and Understanding Workshop (ASRU)},
-  
   pages={122--129},
-  
   year={2021},
-  
   organization={IEEE}
-  
 }
+```
