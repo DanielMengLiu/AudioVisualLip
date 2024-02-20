@@ -6,12 +6,20 @@ Audio-Visual Voice Biometrics is a audio-visual speaker recognition task, which 
 This is the official implementation of ICASSP23 paper CROSS-MODAL AUDIO-VISUAL CO-LEARNING FOR TEXT-INDEPENDENT SPEAKER VERIFICATION.
 
 ## Datasets
+Please turn to the ./preprocessing to extract lips for the training and test datasets.
 <img src="https://github.com/DanielMengLiu/AudioVisualLip/assets/45690014/d1f88a36-e874-49cd-a02c-25b98c423362" width="700">
 <img src="https://github.com/DanielMengLiu/AudioVisualLip/assets/45690014/1f2d5917-8cd8-4e57-b0c7-872f020f2bf5" width="300" align="top">
+
+## Running 
+After getting the lip data of training sets and test sets, you could run ./main_audiovisuallip_DATASET_CM.py for training and testing with only switching the stage in the code. When doing this, be sure to change the ./conf/config_audiovisuallip_DATASET_new.yaml to your own configuration.
 
 ## Results
 <img src="https://github.com/DanielMengLiu/AudioVisualLip/assets/45690014/d70da2de-c2f8-417f-999d-2d9778ba719a" width="800">
 <img src="https://github.com/DanielMengLiu/AudioVisualLip/assets/45690014/f548da67-f55a-4af0-9ec4-8a85b7ceff73" width="400">
+
+## pretrained models
+You could find the pretrained audio-only and visual-only model here:
+https://drive.google.com/drive/folders/1IalsNtmDH-qFnfgmn_O92J1MUHCaQepl?usp=sharing
 
 ## Reference
 AVLip:
